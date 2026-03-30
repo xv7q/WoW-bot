@@ -34,7 +34,7 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setColor(t.color)
       .setTitle(`💰 ${target.username}'s Ancient Treasury`)
-      .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+      .setThumbnail(target.displayAvatarURL())
       .setDescription(
         `> ${t.name}\n\n` +
         `\`\`\`\n[${bar}]\n${coins.toLocaleString()} / 10,000 shown\`\`\``
