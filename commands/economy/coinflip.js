@@ -1,118 +1,101 @@
 const { EmbedBuilder } = require("discord.js");
 const { getUser, saveUser } = require("../../utils/database");
 
-const SPIN_FRAMES = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
+const FRAMES = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌑", "🌒"];
 
 module.exports = {
   name: "coinflip",
   aliases: ["cf", "wcf", "flip", "ocf"],
-  description: "Flip a coin and bet Ancient Coins!",
+  description: "Flip a coin — bet to win 2x!",
   async execute(message, args) {
     const user = getUser(message.author.id);
 
-    const sideArg = (args[0] || "").toLowerCase();
-    const betArg = args[1];
+    // Parse: cf 500  OR  cf heads 500  OR  cf h 500  OR  cf all
+    let pick = null;
+    let betStr = null;
 
-    const validSides = ["heads", "tails", "h", "t"];
-    if (!validSides.includes(sideArg) || !betArg) {
+    if (!args[0]) {
       return message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("#C9A84C")
-            .setTitle("🪙 Ancient Coin Flip")
-            .setDescription(
-              "**Usage:** `cf heads 500` or `cf tails all`\n\n" +
-              "🟡 **Heads** or ⚫ **Tails**\n" +
-              "Win = **2x** your bet!\n\n" +
-              `💰 **Balance: ${(user.coins||0).toLocaleString()} coins**`
-            ),
-        ],
+        embeds: [new EmbedBuilder().setColor("#C9A84C")
+          .setTitle("🪙 Ancient Coin Flip")
+          .setDescription(
+            "**Usage:**\n" +
+            "`cf <bet>` — random side\n" +
+            "`cf heads <bet>` or `cf h <bet>` — pick heads\n" +
+            "`cf tails <bet>` or `cf t <bet>` — pick tails\n" +
+            "`cf all` — bet everything!\n\n" +
+            `💰 Balance: **${(user.coins||0).toLocaleString()} coins**`
+          )],
       });
     }
 
+    const a0 = args[0].toLowerCase();
+    const a1 = (args[1] || "").toLowerCase();
+
+    if (a0 === "heads" || a0 === "h") { pick = "heads"; betStr = a1; }
+    else if (a0 === "tails" || a0 === "t") { pick = "tails"; betStr = a1; }
+    else { betStr = a0; } // no side given → random
+
     let bet;
-    if (betArg === "all" || betArg === "max") bet = Math.min(user.coins || 0, 100000);
-    else bet = parseInt(betArg);
+    if (betStr === "all" || betStr === "max") bet = Math.min(user.coins || 0, 100000);
+    else bet = parseInt(betStr);
 
-    if (isNaN(bet) || bet <= 0) return message.reply("❌ Invalid bet!");
+    if (isNaN(bet) || bet <= 0) return message.reply("❌ Invalid bet amount!");
     if (bet > 100000) return message.reply("❌ Max bet is **100,000 coins**!");
-    if ((user.coins || 0) < bet) return message.reply(`❌ Not enough coins! You have **${user.coins || 0}** coins.`);
+    if ((user.coins || 0) < bet) return message.reply(`❌ You only have **${(user.coins||0).toLocaleString()}** coins!`);
 
-    const pick = sideArg === "h" ? "heads" : sideArg === "t" ? "tails" : sideArg;
+    // If no pick → random
+    if (!pick) pick = Math.random() < 0.5 ? "heads" : "tails";
+
     const result = Math.random() < 0.5 ? "heads" : "tails";
     const won = pick === result;
 
-    // === ANIMATION ===
+    // ── ANIMATION ──
     const msg = await message.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor("#888888")
-          .setTitle("🪙 The Ancient Coin Spins...")
-          .setDescription(`*${message.author.username}* bets **${bet.toLocaleString()} coins** on **${pick.toUpperCase()}**\n\n${SPIN_FRAMES[0]} *The coin flips into the air...*`),
-      ],
+      embeds: [new EmbedBuilder().setColor("#555555")
+        .setTitle("🪙 Flipping the Ancient Coin...")
+        .setDescription(`> You chose: **${pick.toUpperCase()}**\n> Bet: **${bet.toLocaleString()} coins**\n\n${FRAMES[0]}  *spinning...*`)],
     });
 
-    // Spin frames
-    for (let i = 1; i < SPIN_FRAMES.length; i++) {
-      await new Promise(r => setTimeout(r, 180));
-      const phrases = [
-        "spinning...", "turning...", "flipping...", "the ancient magic decides...",
-        "almost...", "nearly there...", "the relic gods choose...", "final moments..."
-      ];
+    for (let i = 1; i < FRAMES.length; i++) {
+      await new Promise(r => setTimeout(r, 160));
+      const phrases = ["spinning..","turning..","ancient magic decides..","almost..","the relic gods choose..","final spin..","landing..","it falls..","nearly..","result!"];
       await msg.edit({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("#999999")
-            .setTitle("🪙 The Ancient Coin Spins...")
-            .setDescription(`*${message.author.username}* bets **${bet.toLocaleString()} coins** on **${pick.toUpperCase()}**\n\n${SPIN_FRAMES[i]} *${phrases[i]}*`),
-        ],
+        embeds: [new EmbedBuilder().setColor("#777777")
+          .setTitle("🪙 Flipping the Ancient Coin...")
+          .setDescription(`> You chose: **${pick.toUpperCase()}**\n> Bet: **${bet.toLocaleString()} coins**\n\n${FRAMES[i]}  *${phrases[i]}*`)],
       });
     }
 
     await new Promise(r => setTimeout(r, 400));
 
-    // Final result
-    const resultEmoji = result === "heads" ? "🟡" : "⚫";
-    const pickEmoji = pick === "heads" ? "🟡" : "⚫";
-
-    if (won) {
-      user.coins = (user.coins || 0) + bet;
-    } else {
-      user.coins = (user.coins || 0) - bet;
-    }
+    if (won) user.coins = (user.coins || 0) + bet;
+    else user.coins = (user.coins || 0) - bet;
     saveUser(message.author.id, user);
 
-    const winLines = [
-      "The ancient spirits favor your intuition!",
-      "The relic gods smile upon you!",
-      "Fortune blesses the worthy hunter!",
-    ];
-    const loseLines = [
-      "The coin lands against you... :c",
-      "The ancient curse claims your coins...",
-      "The relics are not pleased with your choice.",
-    ];
+    const resultEmoji = result === "heads" ? "🟡" : "⚫";
+    const pickEmoji   = pick   === "heads" ? "🟡" : "⚫";
+    const winMsgs = ["The ancient spirits bless you! 🙌", "Fortune favors the bold! ✨", "The relic gods smile upon you! 🏺"];
+    const loseMsgs = ["The relics are displeased... 😔", "Ancient curse activated! 💀", "The coin laughs at your loss... :c"];
 
     await msg.edit({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(won ? "#FFD700" : "#8B0000")
-          .setTitle(won ? "🪙 YOU WIN! The coin lands!" : "🪙 You lose... The coin has spoken.")
-          .setDescription(
-            `${pickEmoji} You chose: **${pick.toUpperCase()}**\n` +
-            `${resultEmoji} Result: **${result.toUpperCase()}**\n\n` +
-            (won
-              ? `✅ **+${bet.toLocaleString()} coins!**\n*${winLines[Math.floor(Math.random()*winLines.length)]}*`
-              : `❌ **-${bet.toLocaleString()} coins!**\n*${loseLines[Math.floor(Math.random()*loseLines.length)]}*`)
-          )
-          .addFields(
-            { name: "💸 Bet",     value: `${bet.toLocaleString()} coins`,              inline: true },
-            { name: won ? "✅ Won" : "❌ Lost", value: `${bet.toLocaleString()} coins`, inline: true },
-            { name: "💰 Balance", value: `**${user.coins.toLocaleString()} coins**`,    inline: true },
-          )
-          .setFooter({ text: "🪙 wow!cf heads <bet> | wow!cf tails <bet>" })
-          .setTimestamp(),
-      ],
+      embeds: [new EmbedBuilder()
+        .setColor(won ? "#00E676" : "#FF1744")
+        .setTitle(won ? "🪙 ✅ YOU WIN!" : "🪙 ❌ You lose...")
+        .setDescription(
+          `${pickEmoji} You picked: **${pick.toUpperCase()}**\n` +
+          `${resultEmoji} Result: **${result.toUpperCase()}**\n\n` +
+          (won
+            ? `### +${bet.toLocaleString()} coins!\n*${winMsgs[Math.floor(Math.random()*winMsgs.length)]}*`
+            : `### -${bet.toLocaleString()} coins\n*${loseMsgs[Math.floor(Math.random()*loseMsgs.length)]}*`)
+        )
+        .addFields(
+          { name: "💸 Bet",     value: `${bet.toLocaleString()}`,          inline: true },
+          { name: won?"✅ Won":"❌ Lost", value: `${bet.toLocaleString()}`, inline: true },
+          { name: "💰 Balance", value: `**${user.coins.toLocaleString()}**`,inline: true },
+        )
+        .setFooter({ text: `${message.author.username} • coinflip` })
+        .setTimestamp()],
     });
   },
 };
