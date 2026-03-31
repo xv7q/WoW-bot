@@ -1,21 +1,20 @@
 const { EmbedBuilder } = require("discord.js");
 
-// ---- WOW ----
 module.exports = {
   name: "wow",
   description: "WOW!",
   async execute(message) {
     const wows = [
-      "✨ **W O W** ✨\n*The relics tremble at your amazement!*",
-      "🏺 **WOW!** The ancient spirits are impressed!",
-      "⚡ **WOW!** Even the legendary Crown of Ages bows!",
-      "👁️ **W O W** — The Eye of Gods has seen your reaction!",
-      "🌌 **WOW!!!** The Void Gem glows brighter!",
+      { text: "# W • O • W\n*The ancient relics tremble at your amazement!*", color: "#FFD700" },
+      { text: "# ✨ WOW! ✨\n*The Crystal Skull glows at your reaction!*",      color: "#9C27B0" },
+      { text: "# 🌍 W O W 🌍\n*Even the World Shard is impressed!*",            color: "#FF4444" },
+      { text: "# 👑 WOW!!!\n*The Crown of Ages bows before you!*",              color: "#FF9800" },
+      { text: "# 🔮 wow...\n*The Void Gem pulses with your energy!*",           color: "#2196F3" },
     ];
-    const embed = new EmbedBuilder()
-      .setColor("#FFD700")
-      .setDescription(wows[Math.floor(Math.random() * wows.length)])
-      .setFooter({ text: `Wowed by ${message.author.username}` });
-    message.reply({ embeds: [embed] });
+    const w = wows[Math.floor(Math.random() * wows.length)];
+    message.reply({
+      embeds: [new EmbedBuilder().setColor(w.color).setDescription(w.text)
+        .setFooter({ text: `Wowed by ${message.author.username}` })],
+    });
   },
 };
