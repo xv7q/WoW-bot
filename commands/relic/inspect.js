@@ -4,33 +4,29 @@ const { getRelicById, RARITY_COLORS, RARITY_EMOJI } = require("../../utils/relic
 module.exports = {
   name: "inspect",
   aliases: ["info", "relic"],
-  description: "Inspect a relic's details",
+  description: "Inspect a relic's full details",
   async execute(message, args) {
-    if (!args[0]) return message.reply("Usage: `wow!inspect <relic_id>`");
+    if (!args[0]) return message.reply("Usage: `inspect <relic_id>` — use `relics info` to see IDs");
 
     const relic = getRelicById(args[0].toLowerCase());
-    if (!relic) {
-      return message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("#8B0000")
-            .setDescription("❌ Unknown relic ID. Check `wow!relics` for valid IDs."),
-        ],
-      });
-    }
+    if (!relic) return message.reply({
+      embeds: [new EmbedBuilder().setColor("#FF1744")
+        .setDescription("❌ Unknown relic ID.\nUse `relics info` to see all valid IDs.")],
+    });
 
-    const embed = new EmbedBuilder()
-      .setColor(RARITY_COLORS[relic.rarity])
-      .setTitle(`${relic.emoji} ${relic.name}`)
-      .setDescription(`*"${relic.desc}"*`)
-      .addFields(
-        { name: "✨ Rarity", value: `${RARITY_EMOJI[relic.rarity]} ${relic.rarity.toUpperCase()}`, inline: true },
-        { name: "⚡ Power", value: `${relic.power}`, inline: true },
-        { name: "💰 Sell Value", value: `${relic.value} coins`, inline: true },
-        { name: "🔑 ID", value: `\`${relic.id}\``, inline: true },
-      )
-      .setTimestamp();
-
-    message.reply({ embeds: [embed] });
+    message.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(RARITY_COLORS[relic.rarity])
+        .setTitle(`${relic.emoji} ${relic.name}`)
+        .setDescription(`> *"${relic.desc}"*`)
+        .addFields(
+          { name: "✨ Rarity",    value: `${RARITY_EMOJI[relic.rarity]} **${relic.rarity.toUpperCase()}**`, inline: true },
+          { name: "⚡ Power",     value: `**${relic.power}**`,                                              inline: true },
+          { name: "💰 Sell Value",value: `**${relic.value.toLocaleString()} coins**`,                       inline: true },
+          { name: "🔑 Relic ID",  value: `\`${relic.id}\``,                                                inline: true },
+        )
+        .setFooter({ text: "equip <id> • sell <id>" })
+        .setTimestamp()],
+    });
   },
 };

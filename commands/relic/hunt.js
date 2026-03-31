@@ -2,17 +2,16 @@ const { EmbedBuilder } = require("discord.js");
 const { getUser, saveUser } = require("../../utils/database");
 const { getRandomRelic, RARITY_COLORS, RARITY_EMOJI } = require("../../utils/relics");
 
-const HUNT_COOLDOWN = 30 * 1000; // 30 seconds
-
-const HUNT_LOCATIONS = [
-  "🏜️ **Saharan Tomb** — The sand shifts to reveal something...",
-  "🏔️ **Himalayan Cave** — Ice-cold walls hide ancient secrets...",
-  "🌊 **Sunken Atlantis** — Diving deep into forgotten waters...",
-  "🌿 **Amazon Ruins** — The jungle swallows everything but this...",
-  "🏛️ **Roman Catacombs** — Beneath the city, history sleeps...",
-  "🗾 **Feudal Japan Shrine** — The spirits part the mist for you...",
-  "🏝️ **Lost Pacific Island** — A civilization that left no name...",
-  "❄️ **Arctic Permafrost** — Frozen for ten thousand years...",
+const HUNT_CD = 30000;
+const LOCATIONS = [
+  { name: "🏜️ Saharan Tomb",         dig: ["Brushing sand aside...", "A chamber revealed!", "Something gleams below..."] },
+  { name: "🏔️ Himalayan Cave",       dig: ["Chipping through ice...", "Ancient frost cracks...", "The cold hides secrets..."] },
+  { name: "🌊 Sunken Atlantis",       dig: ["Diving deeper...", "Ruins shimmer below...", "Barnacled chest found!"] },
+  { name: "🌿 Amazon Ruins",          dig: ["Pushing through vines...", "Stone carvings appear...", "The jungle parts!"] },
+  { name: "🏛️ Roman Catacombs",      dig: ["Torch flickering...", "Bones line the walls...", "A hidden alcove!"] },
+  { name: "🗾 Feudal Japan Shrine",   dig: ["Incense fills the air...", "Spirits stir...", "The shrine door opens!"] },
+  { name: "❄️ Arctic Permafrost",     dig: ["Ground frozen solid...", "Tools barely work...", "Ice cracks open!"] },
+  { name: "🏝️ Lost Pacific Island",  dig: ["Sand gives way...", "Palm roots tangle...", "Buried treasure chest!"] },
 ];
 
 module.exports = {
@@ -23,62 +22,81 @@ module.exports = {
     const user = getUser(message.author.id);
     const now = Date.now();
 
-    // Cooldown check
-    if (user.lastHunt && now - user.lastHunt < HUNT_COOLDOWN) {
-      const remaining = Math.ceil((HUNT_COOLDOWN - (now - user.lastHunt)) / 1000);
-      const embed = new EmbedBuilder()
-        .setColor("#8B0000")
-        .setTitle("⏳ The Ancient Grounds Need Rest")
-        .setDescription(`You must wait **${remaining}s** before hunting again.\n*The relics need time to surface...*`);
-      return message.reply({ embeds: [embed] });
+    if (user.lastHunt && now - user.lastHunt < HUNT_CD) {
+      const rem = Math.ceil((HUNT_CD - (now - user.lastHunt)) / 1000);
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor("#FF9800")
+          .setTitle("⛏️ Still Digging...")
+          .setDescription(`The excavation site needs **${rem}s** to reset.\n*Ancient grounds must be respected.*`)],
+      });
     }
 
-    // Random chance to find nothing (10%)
+    const loc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+
+    // ── ANIMATION ──
+    const msg = await message.reply({
+      embeds: [new EmbedBuilder().setColor("#555555")
+        .setTitle(`🔍 Hunting at ${loc.name}`)
+        .setDescription(`*${loc.dig[0]}*\n\n⏳ Searching...`)],
+    });
+
+    await new Promise(r => setTimeout(r, 800));
+    await msg.edit({ embeds: [new EmbedBuilder().setColor("#666666")
+      .setTitle(`🔍 Hunting at ${loc.name}`)
+      .setDescription(`*${loc.dig[1]}*\n\n⛏️ Almost there...`)] });
+
+    await new Promise(r => setTimeout(r, 900));
+    await msg.edit({ embeds: [new EmbedBuilder().setColor("#777777")
+      .setTitle(`🔍 Hunting at ${loc.name}`)
+      .setDescription(`*${loc.dig[2]}*\n\n✨ Found something!`)] });
+
+    await new Promise(r => setTimeout(r, 600));
+
+    // 10% nothing
     if (Math.random() < 0.1) {
       user.lastHunt = now;
       saveUser(message.author.id, user);
-
-      const location = HUNT_LOCATIONS[Math.floor(Math.random() * HUNT_LOCATIONS.length)];
-      const embed = new EmbedBuilder()
-        .setColor("#666666")
-        .setTitle("🕳️ Empty Handed...")
-        .setDescription(`${location}\n\n*You searched but found nothing this time. The relics hide their secrets well.*`);
-      return message.reply({ embeds: [embed] });
+      return msg.edit({ embeds: [new EmbedBuilder().setColor("#444444")
+        .setTitle(`🕳️ Nothing at ${loc.name}`)
+        .setDescription(`*You searched thoroughly but the ancient grounds yielded nothing this time.*\n\nBetter luck next hunt! *(30s cooldown)*`)] });
     }
 
     const relic = getRandomRelic();
     user.relics = user.relics || [];
     user.relics.push(relic.id);
     user.lastHunt = now;
-
-    // Bonus XP for hunting
     user.xp = (user.xp || 0) + Math.floor(relic.power / 2);
-
     saveUser(message.author.id, user);
 
-    const location = HUNT_LOCATIONS[Math.floor(Math.random() * HUNT_LOCATIONS.length)];
+    const color = RARITY_COLORS[relic.rarity];
+    const rarityEmoji = RARITY_EMOJI[relic.rarity];
 
     const embed = new EmbedBuilder()
-      .setColor(RARITY_COLORS[relic.rarity])
-      .setTitle(`${RARITY_EMOJI[relic.rarity]} Relic Found! ${relic.emoji} ${relic.name}`)
-      .setDescription(location)
-      .addFields(
-        { name: "📖 Description", value: relic.desc },
-        { name: "⚡ Power", value: `${relic.power}`, inline: true },
-        { name: "💰 Value", value: `${relic.value} coins`, inline: true },
-        { name: "✨ Rarity", value: `${RARITY_EMOJI[relic.rarity]} ${relic.rarity.toUpperCase()}`, inline: true },
-        { name: "📦 ID", value: `\`${relic.id}\``, inline: true },
+      .setColor(color)
+      .setTitle(`${rarityEmoji} ${relic.emoji} ${relic.name} Discovered!`)
+      .setDescription(
+        `**Location:** ${loc.name}\n\n` +
+        `> *"${relic.desc}"*\n\n` +
+        `\`\`\`\n` +
+        `Rarity   : ${rarityEmoji} ${relic.rarity.toUpperCase()}\n` +
+        `Power    : ⚡ ${relic.power}\n` +
+        `Value    : 🪙 ${relic.value.toLocaleString()} coins\n` +
+        `ID       : ${relic.id}\n` +
+        `\`\`\``
       )
-      .setFooter({ text: `Use "wow!sell ${relic.id}" to sell • "wow!equip ${relic.id}" to equip` })
+      .addFields(
+        { name: "📦 Total Relics", value: `**${user.relics.length}**`, inline: true },
+        { name: "⚡ XP Gained",    value: `+${Math.floor(relic.power/2)}`,inline: true },
+      )
+      .setFooter({ text: `sell ${relic.id} • equip ${relic.id} • inspect ${relic.id}` })
       .setTimestamp();
 
     if (relic.rarity === "legendary") {
-      embed.setTitle(`🌟 LEGENDARY RELIC DISCOVERED! ${relic.emoji} ${relic.name} 🌟`);
-      message.channel.send(`✨ **${message.author.username}** just found a **LEGENDARY RELIC**: ${relic.emoji} **${relic.name}**! The earth shakes! 🌍`);
+      message.channel.send(`🌟 **${message.author.username}** just unearthed a **LEGENDARY RELIC** — ${relic.emoji} **${relic.name}**! The earth trembles! 🌍`);
     } else if (relic.rarity === "epic") {
-      message.channel.send(`💜 **${message.author.username}** unearthed an **EPIC RELIC**: ${relic.emoji} **${relic.name}**!`);
+      message.channel.send(`💜 **${message.author.username}** found an **EPIC RELIC** — ${relic.emoji} **${relic.name}**!`);
     }
 
-    message.reply({ embeds: [embed] });
+    msg.edit({ embeds: [embed] });
   },
 };

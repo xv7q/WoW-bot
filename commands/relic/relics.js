@@ -13,66 +13,96 @@ const TIERS = [
 module.exports = {
   name: "relics",
   aliases: ["collection", "wr", "bag", "inv", "inventory", "zoo", "oz"],
-  description: "View your relic collection (OWO zoo style!)",
+  description: "View your relic collection. Use `relics info` to see all IDs!",
   async execute(message, args) {
     const target = message.mentions.users.first() || message.author;
     const user = getUser(target.id);
     const owned = user.relics || [];
 
+    // ── INFO MODE: relics info or wwr info ──
+    // Shows every relic with emoji + name + id
+    if (args[0] === "info" || args[0] === "list" || args[0] === "ids") {
+      const pages = [];
+      for (const tier of TIERS) {
+        const inTier = RELICS.filter(r => r.rarity === tier.key);
+        if (inTier.length === 0) continue;
+
+        const counts = {};
+        for (const id of owned) counts[id] = (counts[id] || 0) + 1;
+
+        const rows = inTier.map(r => {
+          const has = counts[r.id] || 0;
+          const owned_mark = has > 0 ? `✅ x${has}` : "❌";
+          return `${r.emoji} **${r.name}**\n> ID: \`${r.id}\`  •  ${owned_mark}  •  ⚡${r.power}  •  🪙${r.value.toLocaleString()}`;
+        }).join("\n\n");
+
+        pages.push({ tier, rows });
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor("#C9A84C")
+        .setTitle("📖 All Relics — ID Reference")
+        .setDescription(
+          "*All relics in the game. ✅ = you own it.*\n\n" +
+          pages.map(p => `${p.tier.icon} **${p.tier.key.toUpperCase()}**\n${p.rows}`).join("\n\n─────────────────\n\n")
+        )
+        .setFooter({ text: "sell <id> • equip <id> • inspect <id>" })
+        .setTimestamp();
+
+      // Discord 4096 char limit — split if needed
+      const desc = embed.data.description;
+      if (desc.length > 4000) {
+        // Send legendary+epic first, then rest
+        const part1 = pages.slice(0,2).map(p => `${p.tier.icon} **${p.tier.key.toUpperCase()}**\n${p.rows}`).join("\n\n─────────────────\n\n");
+        const part2 = pages.slice(2).map(p => `${p.tier.icon} **${p.tier.key.toUpperCase()}**\n${p.rows}`).join("\n\n─────────────────\n\n");
+
+        await message.reply({ embeds: [
+          new EmbedBuilder().setColor("#FF9800").setTitle("📖 All Relics — Legendary & Epic").setDescription("*All relics. ✅ = you own it.*\n\n" + part1).setFooter({ text: "Part 1/2" })
+        ]});
+        return message.channel.send({ embeds: [
+          new EmbedBuilder().setColor("#2196F3").setTitle("📖 All Relics — Rare, Uncommon & Common").setDescription(part2).setFooter({ text: "Part 2/2 • sell <id> • equip <id>" })
+        ]});
+      }
+
+      return message.reply({ embeds: [embed] });
+    }
+
+    // ── ZOO MODE (default) ──
     if (owned.length === 0) {
       return message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("#666666")
-            .setTitle("🕳️ Empty Vault!")
-            .setDescription(
-              `**${target.username}** hasn't found any relics yet!\n\n` +
-              `Use \`hunt\` to start your collection!`
-            ),
-        ],
+        embeds: [new EmbedBuilder().setColor("#444444")
+          .setTitle("🕳️ Empty Vault!")
+          .setDescription(`**${target.username}** hasn't found any relics!\nUse \`hunt\` to start your collection!`)],
       });
     }
 
-    // Count each relic
     const counts = {};
     for (const id of owned) counts[id] = (counts[id] || 0) + 1;
 
-    // Build zoo rows per tier
-    let zooText = "";
-    let totalPower = 0;
+    let zooText = "", totalPower = 0;
     const stats = {};
 
     for (const tier of TIERS) {
       const inTier = RELICS.filter(r => r.rarity === tier.key && counts[r.id]);
-      const total = owned.filter(id => {
+      stats[tier.label] = owned.filter(id => {
         const r = RELICS.find(x => x.id === id);
         return r && r.rarity === tier.key;
       }).length;
-      stats[tier.label] = total;
 
       if (inTier.length === 0) continue;
 
-      // Each relic: emoji + padded count
       const row = inTier.map(r => {
-        const c = counts[r.id];
-        totalPower += r.power * c;
-        return `${r.emoji}\`${String(c).padStart(2, "0")}\``;
+        totalPower += r.power * counts[r.id];
+        return `${r.emoji}\`${String(counts[r.id]).padStart(2,"0")}\``;
       }).join(" ");
 
       zooText += `${tier.icon} **${tier.key.toUpperCase()}**\n${row}\n\n`;
     }
 
-    // Summary line like OWO: L-1, E-3, R-5, U-8, C-12
-    const summary = TIERS.map(t => `${t.label}-${stats[t.label] || 0}`).join(", ");
-
-    // Equipped
+    const summary = TIERS.map(t => `${t.label}-${stats[t.label]||0}`).join(", ");
     const equipped = user.equipped ? RELICS.find(r => r.id === user.equipped) : null;
-
-    // Highest rarity owned - for embed color
     let embedColor = RARITY_COLORS["common"];
-    for (const tier of TIERS) {
-      if (stats[tier.label] > 0) { embedColor = RARITY_COLORS[tier.key]; break; }
-    }
+    for (const tier of TIERS) { if (stats[tier.label] > 0) { embedColor = RARITY_COLORS[tier.key]; break; } }
 
     const embed = new EmbedBuilder()
       .setColor(embedColor)
@@ -87,27 +117,22 @@ module.exports = {
       .addFields(
         {
           name: "📊 Stats",
-          value:
-            `🟧 Legendary: **${stats["L"] || 0}**  ` +
-            `🟪 Epic: **${stats["E"] || 0}**  ` +
-            `🟦 Rare: **${stats["R"] || 0}**  ` +
-            `🟩 Uncommon: **${stats["U"] || 0}**  ` +
-            `⬜ Common: **${stats["C"] || 0}**`,
+          value: `🟧 \`${stats["L"]||0}\`  🟪 \`${stats["E"]||0}\`  🟦 \`${stats["R"]||0}\`  🟩 \`${stats["U"]||0}\`  ⬜ \`${stats["C"]||0}\`  📦 **${owned.length} total**`,
         },
         {
-          name: "🔮 Equipped Relic",
+          name: "🔮 Equipped",
           value: equipped
             ? `${equipped.emoji} **${equipped.name}** ${RARITY_EMOJI[equipped.rarity]} *(+${equipped.power} power)*`
-            : "*Nothing equipped — use `equip <id>`*",
+            : "*Nothing — use `equip <id>`*",
           inline: true,
         },
         {
-          name: "📦 Total",
-          value: `**${owned.length}** relics collected`,
+          name: "💡 Tip",
+          value: "`relics info` to see all relic IDs",
           inline: true,
         },
       )
-      .setFooter({ text: "hunt • sell <id> • equip <id> • inspect <id>" })
+      .setFooter({ text: "hunt • sell <id> • equip <id> • relics info" })
       .setTimestamp();
 
     message.reply({ embeds: [embed] });

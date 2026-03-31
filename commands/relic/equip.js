@@ -4,51 +4,44 @@ const { getRelicById, RARITY_COLORS, RARITY_EMOJI } = require("../../utils/relic
 
 module.exports = {
   name: "equip",
-  description: "Equip a relic",
+  description: "Equip a relic for power bonuses",
   async execute(message, args) {
-    if (!args[0]) return message.reply("Usage: `wow!equip <relic_id>` or `wow!equip none` to unequip");
+    if (!args[0]) return message.reply("Usage: `equip <relic_id>` or `equip none`");
 
     const user = getUser(message.author.id);
 
     if (args[0].toLowerCase() === "none") {
+      const prev = user.equipped ? getRelicById(user.equipped) : null;
       user.equipped = null;
       saveUser(message.author.id, user);
       return message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("#666")
-            .setDescription("🔓 Relic unequipped. Your power returns to baseline."),
-        ],
+        embeds: [new EmbedBuilder().setColor("#666666")
+          .setDescription(`🔓 **Unequipped** ${prev ? `${prev.emoji} ${prev.name}` : "relic"}.\n*Power returned to baseline.*`)],
       });
     }
 
-    const relicId = args[0].toLowerCase();
-    if (!(user.relics || []).includes(relicId)) {
-      return message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("#8B0000")
-            .setDescription("❌ You don't own that relic! Check `wow!relics`"),
-        ],
-      });
-    }
+    const id = args[0].toLowerCase();
+    if (!(user.relics || []).includes(id)) return message.reply({
+      embeds: [new EmbedBuilder().setColor("#FF1744")
+        .setDescription("❌ You don't own that relic! Use `relics info` for IDs.")],
+    });
 
-    const relic = getRelicById(relicId);
+    const relic = getRelicById(id);
     if (!relic) return message.reply("❌ Unknown relic.");
 
-    user.equipped = relicId;
+    user.equipped = id;
     saveUser(message.author.id, user);
 
-    const embed = new EmbedBuilder()
-      .setColor(RARITY_COLORS[relic.rarity])
-      .setTitle(`${relic.emoji} Relic Equipped!`)
-      .setDescription(
-        `You equipped **${relic.name}** ${RARITY_EMOJI[relic.rarity]}\n\n` +
-        `*${relic.desc}*\n\n` +
-        `⚡ Power granted: **+${relic.power}**`
-      )
-      .setTimestamp();
-
-    message.reply({ embeds: [embed] });
+    message.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(RARITY_COLORS[relic.rarity])
+        .setTitle(`${relic.emoji} Relic Equipped!`)
+        .setDescription(
+          `### ${relic.name} ${RARITY_EMOJI[relic.rarity]}\n` +
+          `> *"${relic.desc}"*\n\n` +
+          `\`\`\`\nPower bonus : +${relic.power}\nRarity      : ${relic.rarity.toUpperCase()}\`\`\``
+        )
+        .setTimestamp()],
+    });
   },
 };
